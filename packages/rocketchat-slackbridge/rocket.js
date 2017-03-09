@@ -29,6 +29,8 @@ class RocketAdapter {
 		RocketChat.callbacks.add('afterDeleteMessage', this.onMessageDelete.bind(this), RocketChat.callbacks.priority.LOW, 'SlackBridge_Delete');
 		RocketChat.callbacks.add('setReaction', this.onSetReaction.bind(this), RocketChat.callbacks.priority.LOW, 'SlackBridge_SetReaction');
 		RocketChat.callbacks.add('unsetReaction', this.onUnSetReaction.bind(this), RocketChat.callbacks.priority.LOW, 'SlackBridge_UnSetReaction');
+		RocketChat.callbacks.add('messagePinned', this.onMessagePinned.bind(this), RocketChat.callbacks.priority.LOW, 'SlackBridge_MessagePinned');
+		RocketChat.callbacks.add('messageUnPinned', this.onMessageUnPinned.bind(this), RocketChat.callbacks.priority.LOW, 'SlackBridge_MessageUnPinned');
 	}
 
 	unregisterForEvents() {
@@ -37,6 +39,8 @@ class RocketAdapter {
 		RocketChat.callbacks.remove('afterDeleteMessage', 'SlackBridge_Delete');
 		RocketChat.callbacks.remove('setReaction', 'SlackBridge_SetReaction');
 		RocketChat.callbacks.remove('unsetReaction', 'SlackBridge_UnSetReaction');
+		RocketChat.callbacks.remove('messagePinned', 'SlackBridge_MessagePinned');
+		RocketChat.callbacks.remove('messageUnPinned', 'SlackBridge_MessageUnPinned');
 	}
 
 	onMessageDelete(rocketMessageDeleted) {
@@ -74,6 +78,32 @@ class RocketAdapter {
 		} catch (err) {
 			logger.rocket.error('Unhandled error onSetReaction', err);
 		}
+	}
+
+	onMessagePinned(rocketMsg) {
+		logger.rocket.debug('onMessagePinned', rocketMsg);
+
+		/*
+		RocketMessage
+		 originalMessage.pinned = true
+		 originalMessage.pinnedAt = pinnedAt || Date.now
+		 originalMessage.pinnedBy =
+		 _id: Meteor.userId()
+		 username: me.username
+		 */
+
+		/*
+		Slack API
+		 https://api.slack.com/methods/pins.add
+		 */
+	}
+
+	onMessageUnPinned(rocketMsg) {
+		logger.rocket.debug('onMessageUnPinned', rocketMsg);
+
+		/*
+		https://api.slack.com/methods/pins.remove
+		*/
 	}
 
 	onUnSetReaction(rocketMsgID, reaction) {

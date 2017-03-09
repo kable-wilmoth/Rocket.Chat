@@ -414,6 +414,12 @@ class SlackAdapter {
 				case 'channel_join':
 					this.processChannelJoin(slackMessage);
 					break;
+				case 'pinned_item':
+					this.processPinnedItem(slackMessage, true);
+					break;
+				case 'unpinned_item':
+					this.processPinnedItem(slackMessage, false);
+					break;
 				default:
 					//Keeping backwards compatability for now, refactor later
 					this.processNewMessage(slackMessage, isImporting);
@@ -652,13 +658,54 @@ class SlackAdapter {
 		}
 	}
 
+	processPinnedItem(slackMessage, isPinned) {
+		if (slackMessage.attachments && slackMessage.attachments[0] && slackMessage.attachments[0].text) {
+			const rocketChannel = this.rocket.getChannel(slackMessage);
+			const rocketUser = this.rocket.getUser(slackMessage.user);
+
+			const pinnedTS = new Date(parseInt(slackMessage.attachments[0].ts.split('.')[0]) * 1000);
+			const rocketMsgObj = {
+				rid: rocketChannel._id,
+				t: 'message_pinned',
+				msg: '',
+				u: {
+					_id: rocketUser._id,
+					username: rocketUser.username
+				},
+				attachments: [{
+					'text' : this.rocket.convertSlackMsgTxtToRocketTxtFormat(slackMessage.attachments[0].text),
+					'author_name' : slackMessage.attachments[0].author_subname,
+					'author_icon' : getAvatarUrlFromUsername(slackMessage.attachments[0].author_subname),
+					'ts' : pinnedTS
+				}]
+			};
+
+			/*
+			 * Slack - unpinned_item
+			 * When an item is un-pinned from a channel, an unpinned_item message is sent via slackbot to the user that initially pinned the item. The message will only be sent if the item was un-pinned by a different user.
+			 */
+			const rocketID = this.rocket.createRocketID(slackMessage.attachments[0].channel_id, slackMessage.attachments[0].ts);
+			const rocketMsg = RocketChat.models.Messages.findOneById(rocketID);
+			if (isPinned) {
+				Meteor.runAsUser(rocketUser._id, () => {
+					Meteor.call('pinMessage', rocketMsg, pinnedTS);
+				});
+			} else {
+				Meteor.runAsUser(rocketUser._id, () => {
+					Meteor.call('unpinMessage', rocketMsg);
+				});
+			}
+
+			return rocketMsgObj;
+		}
+	}
 	/*
 	 https://api.slack.com/events/message/message_deleted
 	 */
 	processMessageDeleted(slackMessage) {
 		if (slackMessage.previous_message) {
 			const rocketChannel = this.rocket.getChannel(slackMessage);
-			const rocketUser = RocketChat.models.Users.findOneById('rocket.cat', { fields: { username: 1 } });
+			const rocketUser = this.rocket.getUser(slackMessage.previous_message.user);
 
 			if (rocketChannel && rocketUser) {
 				//Find the Rocket message to delete
@@ -852,36 +899,6 @@ class SlackAdapter {
 				return;
 			case 'file_mention':
 				logger.slack.error('File mentioned not implemented');
-				return;
-			case 'pinned_item':
-				if (slackMessage.attachments && slackMessage.attachments[0] && slackMessage.attachments[0].text) {
-					rocketMsgObj = {
-						rid: rocketChannel._id,
-						t: 'message_pinned',
-						msg: '',
-						u: {
-							_id: rocketUser._id,
-							username: rocketUser.username
-						},
-						attachments: [{
-							'text' : this.rocket.convertSlackMsgTxtToRocketTxtFormat(slackMessage.attachments[0].text),
-							'author_name' : slackMessage.attachments[0].author_subname,
-							'author_icon' : getAvatarUrlFromUsername(slackMessage.attachments[0].author_subname),
-							'ts' : new Date(parseInt(slackMessage.attachments[0].ts.split('.')[0]) * 1000)
-						}]
-					};
-
-					if (!isImporting) {
-						RocketChat.models.Messages.setPinnedByIdAndUserId(`slack-${slackMessage.attachments[0].channel_id}-${slackMessage.attachments[0].ts.replace(/\./g, '-')}`, rocketMsgObj.u, true, new Date(parseInt(slackMessage.ts.split('.')[0]) * 1000));
-					}
-
-					return rocketMsgObj;
-				} else {
-					logger.slack.error('Pinned item with no attachment');
-				}
-				return;
-			case 'unpinned_item':
-				logger.slack.error('Unpinned item not implemented');
 				return;
 		}
 	}

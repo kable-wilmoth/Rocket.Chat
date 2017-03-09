@@ -39,6 +39,9 @@ Meteor.methods
 				"author_icon" : getAvatarUrlFromUsername(originalMessage.u.username),
 				"ts" : originalMessage.ts
 			]
+		Meteor.defer ->
+			# Execute all callbacks
+			RocketChat.callbacks.run 'messagePinned', message
 
 	unpinMessage: (message) ->
 		if not Meteor.userId()
@@ -72,6 +75,9 @@ Meteor.methods
 
 		RocketChat.models.Messages.setPinnedByIdAndUserId originalMessage._id, originalMessage.pinnedBy, originalMessage.pinned
 
-
 		# Meteor.defer ->
 		# 	RocketChat.callbacks.run 'afterSaveMessage', RocketChat.models.Messages.findOneById(message.id)
+
+		Meteor.defer ->
+			# Execute all callbacks
+			RocketChat.callbacks.run 'messageUnPinned', originalMessage
